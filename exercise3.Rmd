@@ -879,3 +879,35 @@ output_matrix2= output_matrix2/sim_no
 
 output_matrix2  
 ```
+
+
+# Problem three
+## (a)
+
+insert the pic here:
+```{r}
+
+```
+
+
+## (b)
+
+My understanding is that classfication accuracy may not always be a good metric in evaluting the performance and there are certainly other metric for doing that, like this one.
+
+for split 1
+start with 200-19 =191
+first split 32, (38, 111)
+
+QD = 1- (38/191)= 0.801
+D=191
+D1= 32
+D2= 149
+QD1= 0
+QD2= 1-(38/111)= 0.657
+
+$Q(D1D2) = (32/191)*0.81 + (149/191)*0= 0.136$
+
+Gain = 0.801 - 0.136 = 0.665
+
+
+
