@@ -1,0 +1,156 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+
+
+
+# 1. Algebra,  probabilities
+## (a) 
+If  $\Omega$ is a infinite sample space (continues variable)
+
+\begin{equation}
+\begin{split}
+&E[f(\omega)+g(\omega)] \\ 
+=&  \int_{\omega} (f(\omega)+g(\omega))p(\omega) d\omega\\
+= & \int_{\omega} f(\omega)p(\omega) d\omega + \int{\omega} f(\omega)g(\omega) d\omega\\
+= & E[f(\omega)) + E[g(\omega)]
+\end{split}
+\end{equation}
+
+and
+\begin{equation}
+\begin{split}
+&E[af(\omega)]\\
+=& \int_{\omega} af(\omega)p(\omega) d\omega \\
+=&a\int_ {\omega} f(\omega)p(\omega) d\omega  \\
+=&aE[f(\omega)] 
+\end{split}
+\end{equation}
+
+
+Given $\Omega$ is a finite sample space,
+if let $h(\omega) = f(\omega)+ g(\omega)$
+
+\begin{equation}
+\begin{split}
+&E[h(\omega)] \\ 
+=& \Sigma_{\omega \in \Omega} P(\omega)h(\omega)\\
+=& \Sigma_{\omega \in \Omega} P(\omega)(f(\omega)+ g(\omega))\\
+=& \Sigma_{\omega \in \Omega} P(\omega)f(\omega)+ \Sigma_{\omega \in \Omega}P(\omega)g(\omega)\\
+= & E[f(\omega)) + E[g(\omega)]
+\end{split}
+\end{equation}
+
+and if let $h(\omega) = a*f(\omega)$
+
+\begin{equation}
+\begin{split}
+&E[af(\omega)]\\
+=&E[h(\omega)]\\
+=& \Sigma_{\omega \in \Omega} P(\omega)h(\omega)\\
+=& \Sigma_{\omega \in \Omega} P(\omega)(a*f(\omega))\\
+=& a*\Sigma_{\omega \in \Omega} P(\omega)f(\omega)\\
+=&a E[f(\omega)] 
+\end{split}
+\end{equation}
+
+So E is an linear operator
+
+## (b)
+\begin{equation}
+\begin{split}
+&Var[f(\omega)]\\
+=& E[(f(\omega)-m)^2] \\
+=& E[f(\omega)^2 + E[f(\omega)]^2 -2f(\omega)*E[f(\omega)]] \\
+=& E[f(\omega)^2] + (E[f(\omega)])^2 - 2E[ f(\omega)*E[f(\omega)] ]\\
+=& E[f(\omega)^2] + (E[f(\omega)])^2 - 2E[f(\omega)]*E[f(\omega)]\\
+=&E[f(\omega)^2] - E(f(\omega))^2
+\end{split}
+\end{equation}
+
+
+
+
+
+# 2.MATRIX CALCULUS
+## (a)
+Since
+\begin{equation}
+    \begin{split}
+        &\lambda_j x_j x_j^\intercal x_i= 0 
+    \end{split},\ when\ i \neq j \\ 
+    \begin{split}
+        &\lambda_j x_j x_j^\intercal x_i\\
+         =& \lambda_i x_i x_i^\intercal x_i\\
+         =& \lambda_i x_i 
+    \end{split} \ when\ i=j \\
+\end{equation}
+
+\begin{equation}
+    \begin{split}
+        &\mathbf{B}x_i \\
+         =& \lambda_i x_i x_i^\intercal x_i\\
+         =& \lambda_i x_i
+    \end{split}
+\end{equation}
+
+
+# 3.Optimization
+Comment: I feel the order of question 3(a) and 3(b) should be changed, since we first should first constrain that there is minimum, before we set out to find the x that satisfy this. Or do we call infinite minimum also a "minimum"
+
+## (a) 
+Suppose there is one unique x that correspond to the minimum f(x),
+\begin{align*}
+    &g(x)\\
+    =&f(x)dx \\
+    =& 4ax^3+b \\
+    let \ &g(x)=0 \\
+    then \ &x= \sqrt[3]{b/4a}
+\end{align*}
+
+
+## (b)
+$a>0$
+ 
+
+
+# 4.Algorithm 
+## (a)
+\begin{align*}
+Fibo(n) \\
+Begin \\
+    if $n \leq 1$ then\\
+        Return n;\\
+    else \\
+       Return Call Fibo(n-1) + Call Fibo(n-2); \\
+  endif \\
+End \\
+\end{align*}
+
+## (b) 
+The time complexity for a recursive fibonacci is $O(2^n)$ 
+
+
+# 5. Basic data analysis, software tools
+
+
+```{r}
+library(data.table)
+
+df <- fread("http://kaip.iki.fi/local/x.csv")
+two_variables <- names(sort(apply(df,2,var),decreasing = T)[1:2])
+two_variables
+plot(x = df[[two_variables[1]]], 
+     y = df[[two_variables[2]]], 
+     xlab = two_variables[1], 
+     ylab=two_variables[2])
+```
+
+
+

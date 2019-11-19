@@ -1,0 +1,467 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r,message=FALSE}
+library(tidyverse)
+```
+
+
+# Problem 1
+## (a)
+
+We know from Bayes' theorm that $P(y=1|x=c(1,2))= \frac{P(x=c(1,2)|y=1)\times P(y=1)}{P(x=c(1,2))}$, 
+
+we know the distribution parameters of $P(x|y=1)$, which is "trained" on the training data. We know prior to seeing the new data, the probablity of observing P(y=1) = 0.5, but what is the probablity of P(x)?? 
+We consider P(x) is considered marginalized (intergrated over all possible values of Y) in our case $P(x)= P(X=c(1,2)|y=1)\times P(y=1) + P(x= c(1,2)|y=0) \times P(y=0)$ 
+
+Therefore, 
+$P(y=1|x=c(1,2))= \frac{P(x=c(1,2)|y=1) }{P(X=c(1,2)|y=1)\times P(y=1) + P(x= c(1,2)|y=0) \times P(y=0)} \times P(y=1)$
+
+Note this fractions are composed of density values, and do we claim this as a likelihood ratio?
+
+Lets get the probablity density values for the fraction terms,
+
+
+```{r}
+
+p1 <- mvtnorm::dmvnorm(x=c(1,2) ,mean= c(0,0),sigma = matrix(c(1,0,0,1),nrow = 2,byrow = T) )
+p0 <- mvtnorm::dmvnorm(x=c(1,2), mean= c(0,0),sigma = matrix(c(16,0,0,16),nrow = 2,byrow = T) )
+
+p1/(p1+p0)*0.5
+```
+
+
+so the posterior probablity is p1/(p1+p0)*0.5 = 0.3027982
+
+## (b) 
+we are going to :
+1)design how to generate the grid  
+2)then compute the density for all the grid points 
+3)create a scatter plot based on grid points coordinates
+4)using the grid points coordinates and their corresponding density value to add the contour plot onto the scatter plot 
+
+
+
+How to generate the grid ? we want the contour plot to be in the ceter of grid point area. In other word we are trying to find x1,x2 that maximize $(P(Y= +1|X) )$, according to the description we know it is (0,0).
+
+We also want to decide the range of grid points that it covers more than 99%(lets say 99.7%, 3\sigma) interval for x1,x2
+so the range should no smaller than (-12,12) for both x1 and x2.
+ 
+```{r}
+cov_mat <- matrix(c(16, 0,0,16  ),nrow = 2,byrow = T)
+grid_mat <- expand.grid((-12:12),(-12:12)) # get input gird coordinates
+den_vec = mvtnorm::dmvnorm(x = grid_mat,mean = c(0,0), sigma =  cov_mat ) #get the density
+
+df <- cbind(grid_mat,den_vec) 
+colnames(df) <- c("x1","x2","p")
+
+df %>% 
+  ggplot() + 
+  geom_point(aes(x=x1,y=x2),size = 0.1)+
+  geom_contour(aes(x=x1,y=x2,z=p))+
+  theme_classic()
+
+```
+
+
+
+## (c)
+since naive bayes classifier above is a special case of LDA, with off-diagnol terms all equal to zero.
+and that LDA are specical cases of QDA where \Sigma_{-} = \Sigma_{+}.
+Therefore naive bayes classfier (described above) is a special case of QDA. 
+
+
+
+
+
+## (d)
+For Gaussian) naive Bayes classifier (let us assume m classes classfication),  we assume a equal variance for pos and neg distributions and zero covariances for both distributions.
+which means (p (No. of mean) + p (No. of variance)) *m (No. distribution) which is 2mp
+
+in QDA it is  (p + p(p + 1)/2)*m =1.5 mp + 0.5mp^2
+
+since p >1 and m >1
+it is clear that QDA is more complex.  This means QDA is more likely to be overfitting and the number of
+training data points required to achieve the asymptotic error is higher in QDA
+
+# Problem 2
+
+## a
+
+lets first generate a training sample (n=100)
+first generate y from the distribution,
+then generate x1 and x2 values based on the y value randomly (by following the distribution)
+
+
+```{r}
+set.seed(1234)
+y <- sample (0:2, size =100, replace =T, prob = c(0.4,0.3,0.3))
+
+
+prob0 <- c(0.6,0.1,0.1,0.1,0.1,0.0)
+prob1 <- c(2,1,4,2,0,1) /10
+prob2 <- c(1,4,3,0,2,0) /10
+prob_list <- list(prob0,prob1,prob2)
+X= matrix(-200:-1,nrow = 100, byrow = T )
+colnames(X) <- c("x1","x2")
+# lets try use a list column and map function in purrr. when there are time 
+
+
+for (i in 1:100){
+  prob <- prob_list[[(y[i]+1)]]
+  X[i,] <- unlist(expand.grid(x1=0:1,x2=0:2)[sample(1:6, 1, replace=TRUE, prob=prob),])
+}
+
+table(y)
+table( apply(X = X, MARGIN = 1, FUN = sum))
+
+```
+
+$p(X= c(0,0)) = \Sigma_{y \in 1,2,3} p(x= c(0,0)|y)\times p(y)$
+which is `0.2*0.4+0.6*0.3+0.1*0.3`
+
+## (b)
+compute the class conditional probablity distribution( The probablity of observing an given independent variable being a certain value under the condition of y equals to a certain value, marginalized over all the value of other independent variables)
+(several different smoothing method will be used)
+
+$P(X_{i}= x|Y = c)= \frac{n_{y,j,x}+m}{n_{y}+ m_1}$
+
+where m and m1 changes according to different smoothing method
+
+all the count values for the fomula given above come from training data which is a random sample from a known distribution.
+
+
+```{r}
+train <- 
+    cbind(X, y) %>% 
+    tbl_df() %>% 
+    group_by_all %>% 
+    mutate(count=1) %>% 
+    summarise(count_cat= sum(count) ) %>% 
+    ungroup()
+
+
+#tranlate the above formula that can calculate conditional probablity into a function with four parameters,  name of the x variable,  its corresponding value, value of response variable and pseudocounts.
+
+
+
+con_p_fun <- function(x_var, x_var_value, y_value,m, alpha_based= F ){
+  x_var1 <- x_var
+  ensym(x_var)  
+  #get the count from the training data
+  n_y= train  %>%
+    filter(y== y_value) %>% 
+    #summarise(count= sum(count_cat)) %>% 
+    pull(count_cat) %>% 
+    sum
+    
+  
+  n_yjh = 
+    train %>% 
+    filter(get(!!x_var) == x_var_value ) %>% 
+    filter(y == y_value) %>% 
+    pull(count_cat) %>% 
+    sum
+  
+    if (x_var1 == "x1" & alpha_based == F ){
+    m1= 2* m
+  } else {
+    m1=3*m
+  }
+  p = (n_yjh + m) / (n_y + m1)
+  return(p)
+}
+```
+
+Now what is the expected marginal probablity to observe x1=1 and y=1
+```{r}
+#con_p_fun(x_var = "x1",x_var_value = 1)
+con_p_fun(x_var = "x1",x_var_value = 1,m = 1,alpha_based = F,y_value = 1)
+```
+
+
+since both input and output are discreate, Lets' list all the possible conditions and calulate the corresponding conditional probablities  
+
+generate a table that list all the conditions
+```{r}
+cond1 <- train %>% select(1,3) %>% distinct() %>% mutate(x_var = "x1") %>% rename(x_value=x1)
+cond2 <- train %>% select(2,3) %>% distinct() %>% mutate(x_var = "x2") %>% rename(x_value=x2)
+cond_df <- rbind(cond1,cond2)%>% select(x_var,x_value,y)
+```
+
+
+
+Now using each row from the condition table as input for the function defined above to compute probabliteies as a new column for the table (okay here I got stuck when tring to use the fancy pmap function, lets first try to use a dummier for loop to finish the work)
+
+```{r}
+
+p1 <- p2 <- p3  <- p4 <- p5 <- p6 <- 1:nrow(cond_df)
+for (i in 1:nrow(cond_df)){
+  a= cond_df$x_var[i]
+  b= cond_df$x_value[i]
+  c= cond_df$y[i]
+  p1[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0,alpha_based = F)  
+  p2[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =1,alpha_based = F)  
+  p3[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0.5,alpha_based = F)  
+  p4[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0, alpha_based = T)  
+  p5[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =1, alpha_based = T)  
+  p6[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0.5, alpha_based = T)  
+} 
+
+
+cond_df <- cond_df %>% 
+  mutate(p1 = p1) %>% 
+  mutate(p2 = p2) %>% 
+  mutate(p3 = p3) %>% 
+  mutate(p4 = p4) %>% 
+  mutate(p5 = p5) %>% 
+  mutate(p6 = p6)
+
+```
+
+cond_df
+
+## (c) 
+first compare the test set accuracy for models trained on 100 instances by using a test set of 10000 samples. note the prediction should be transformed to binary result.
+
+so I should construct a table to represent my estimated model, where there are three columns, x1,x2, expected y, so that if there comes in new data point with x1 and x2 values but no y values, I can quickly predict the y  by checking the table.
+
+Now let transform the condition probility table we had for question (b) into the desired form for (c)
+
+
+Since $P(Y|X)= \frac {P(X|Y)P(Y)}{P(X)}=  \frac {P(x_1|Y)P(x_2|Y)P(Y)}{P(X_1)P(x_2)}= $
+
+we have P(x1|Y) and P(x2|Y) from the table,
+lets then compute P(Y), P(x1) and P(x2) from this table,
+
+the problem is I need to calculate P(y), P(X1), P(X2) from the training data
+but actually this is qute easy, they are uniform across different forms of models, lets just derive those from the training data table
+
+
+
+```{r}
+#get probalities vectors
+py <- table(y)/100
+px1 <- table(X[,1])/100 
+px2 <- table(X[,2])/100
+
+# intialize model table
+model_table <- data.frame(expand.grid(x1=0:1,x2=0:2))
+Pred= matrix(data = -36:-1,nrow = 6)
+check= matrix(data = -9:-1,nrow = 1)
+
+#(number of models)
+for (i in 1:6){
+  column_name= (colnames(cond_df)[4:9])[i]
+  sym(column_name)
+  #(number of combinations for x1 and x2)
+  for (a in 1: 6) {
+    x1= model_table$x1[a]
+    x2= model_table$x2[a]
+    quo(x1)
+    quo(x2)
+    #(number of possible y)
+    p= -3:-1
+    for (b in 1:3) {
+      y_value = c(0,1,2)[b]
+      quo(y_value)
+      p1 <- cond_df %>% filter(x_var== "x1") %>% filter(x_value== !!x1)%>% filter(y== !!y_value) %>% pull(!!column_name)
+      p2 <- cond_df %>% filter(x_var== "x2") %>% filter(x_value== !!x2)%>% filter(y== !!y_value) %>% pull(!!column_name)
+      p3 <- py[b]
+      p4 <- px1[x1+1]
+      p5 <- px2[x2+1]
+      p[b] <- p1*p2*p3/(p4*p5)
+     # w<- c(x1,x2,y_value,p1,p2,p3,p4,p5,p[b])
+      # check <- rbind(check,w)
+     # print(w)
+    }
+    y_pred <- c(0,1,2)[which.max(p)]
+    
+    Pred[a,i] <- y_pred
+  }
+  
+
+}
+      
+check <- cbind(model_table, Pred)    
+colnames(check)[3:8] <- c("p1","p2","p3","p4","p5","p6")
+```
+
+
+lets now generate the test sample
+```{r}
+#set.seed(1234)
+y_test <- sample (0:2, size =10000, replace =T, prob = c(0.4,0.3,0.3))
+
+
+prob0 <- c(0.6,0.1,0.1,0.1,0.1,0.0)
+prob1 <- c(2,1,4,2,0,1) /10
+prob2 <- c(1,4,3,0,2,0) /10
+prob_list <- list(prob0,prob1,prob2)
+X_test= matrix(-20000:-1,nrow = 10000, byrow = T )
+colnames(X_test) <- c("x1","x2")
+
+
+for (i in 1:10000){
+  prob <- prob_list[[(y_test[i]+1)]]
+  X_test[i,] <- unlist(expand.grid(0:1,0:2)[sample(1:6, 1, replace=TRUE, prob=prob),])
+}
+
+# table(y)
+# table( apply(X = X, MARGIN = 1, FUN = sum))
+
+test <- 
+    cbind(X_test, y_test) %>% 
+    tbl_df() 
+
+```
+
+#what is the performance? Lets organize the loss as sum of number of misclassfication cases 
+
+```{r}
+test1 <- test %>% left_join(check)
+
+caret::confusionMatrix(data= test1$p1, reference= test1$y_test)[["overall"]][1]
+caret::confusionMatrix(data= test1$p2, reference= test1$y_test)[["overall"]][1]
+caret::confusionMatrix(data= test1$p3, reference= test1$y_test)[["overall"]][1]
+
+```
+
+## d
+
+lets store a cond_df1 first to make life easier
+```{r}
+  cond1 <- train %>% select(1,3) %>% distinct() %>% mutate(x_var = "x1") %>% rename(x_value=x1)
+  cond2 <- train %>% select(2,3) %>% distinct() %>% mutate(x_var = "x2") %>% rename(x_value=x2)
+  #note you can't use this to genrate a full condition since the sample drawn randomly from the distribution may not contain some specifc value. 
+  cond_df1 <- rbind(cond1,cond2)%>% select(x_var,x_value,y)
+```
+
+
+```{r}
+
+a=25
+i=seq(0,8,1)
+iii=a*2^i
+output_matrix2 <- matrix(rep(0,54),nrow = 9,ncol = 6)
+for (sim in 1:100){
+ print(sim)
+ output_matrix <- matrix(-54:-1,nrow = 9,ncol = 6)
+  for (ii in 1:9){
+    samplesize = iii[ii]
+    #(1) generate training data#############################################################
+    y <- sample (0:2, size =samplesize, replace =T, prob = c(0.4,0.3,0.3))
+    
+    
+    prob0 <- c(0.6,0.1,0.1,0.1,0.1,0.0)
+    prob1 <- c(2,1,4,2,0,1) /10
+    prob2 <- c(1,4,3,0,2,0) /10
+    prob_list <- list(prob0,prob1,prob2)
+    X= matrix((-2*samplesize):-1,nrow = samplesize, byrow = T )
+    colnames(X) <- c("x1","x2")
+  
+    for (i in 1:samplesize){
+      prob <- prob_list[[(y[i]+1)]]
+      X[i,] <- unlist(expand.grid(x1=0:1,x2=0:2)[sample(1:6, 1, replace=TRUE, prob=prob),])
+    }
+    
+    train <- 
+      cbind(X, y) %>% 
+      tbl_df() %>% 
+      group_by_all %>% 
+      mutate(count=1) %>% 
+      summarise(count_cat= sum(count) ) %>% 
+      ungroup()
+  
+    #(2)generate conditional probality table#############################################################
+    cond_df <- cond_df1
+    p1 <- p2 <- p3  <- p4 <- p5 <- p6 <- 1:nrow(cond_df)
+    for (i in 1:nrow(cond_df)){
+      a= cond_df$x_var[i]
+      b= cond_df$x_value[i]
+      c= cond_df$y[i]
+      p1[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0,alpha_based = F)  
+      p2[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =1,alpha_based = F)  
+      p3[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0.5,alpha_based = F)  
+      p4[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0, alpha_based = T)  
+      p5[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =1, alpha_based = T)  
+      p6[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0.5, alpha_based = T)  
+    } 
+    
+    cond_df <- cond_df %>% 
+      mutate(p1 = p1) %>% 
+      mutate(p2 = p2) %>% 
+      mutate(p3 = p3) %>% 
+      mutate(p4 = p4) %>% 
+      mutate(p5 = p5) %>% 
+      mutate(p6 = p6)
+    #(3)compute a model reference table.
+    py <- table(y)/100
+    px1 <- table(X[,1])/100 
+    px2 <- table(X[,2])/100
+    
+    # intialize model table
+    model_table <- data.frame(expand.grid(x1=0:1,x2=0:2))
+    Pred= matrix(data = -36:-1,nrow = 6)
+    check= matrix(data = -9:-1,nrow = 1)
+    
+    #(number of models)
+    for (i in 1:6){
+      column_name= (colnames(cond_df)[4:9])[i]
+      sym(column_name)
+      #(number of combinations for x1 and x2)
+      for (a in 1: 6) {
+        x1= model_table$x1[a]
+        x2= model_table$x2[a]
+        quo(x1)
+        quo(x2)
+        #(number of possible y)
+        p= -3:-1
+        for (b in 1:3) {
+          y_value = c(0,1,2)[b]
+          quo(y_value)
+          p1 <- cond_df %>% filter(x_var== "x1") %>% filter(x_value== !!x1)%>% filter(y== !!y_value) %>% pull(!!column_name)
+          p2 <- cond_df %>% filter(x_var== "x2") %>% filter(x_value== !!x2)%>% filter(y== !!y_value) %>% pull(!!column_name)
+          p3 <- py[b]
+  
+          p4 <- px1[x1+1]
+          p5 <- px2[x2+1]
+          names(p3)  <-names(p4) <- names(p5) <- NULL
+          p[b] <- p1*p2*p3/(p4*p5)
+         # w<- c(x1,x2,y_value,p1,p2,p3,p4,p5,p[b])
+          # check <- rbind(check,w)
+         # print(w)
+        }
+        y_pred <- c(0,1,2)[which.max(p)]
+        
+        Pred[a,i] <- y_pred
+      }
+    }
+          
+    check <- cbind(model_table, Pred)    
+    colnames(check)[3:8] <- c("p1","p2","p3","p4","p5","p6")
+    #(4)generate specific predictions for testing data and compute accuracy
+    test1 <- test %>% left_join(check)
+    output_matrix[ii,1] <- caret::confusionMatrix(data= test1$p1, reference= test1$y_test)[["overall"]][1]
+    output_matrix[ii,2] <- caret::confusionMatrix(data= test1$p2, reference= test1$y_test)[["overall"]][1]
+    output_matrix[ii,3] <- caret::confusionMatrix(data= test1$p3, reference= test1$y_test)[["overall"]][1]
+    output_matrix[ii,4] <- caret::confusionMatrix(data= test1$p4, reference= test1$y_test)[["overall"]][1]
+    output_matrix[ii,5] <- caret::confusionMatrix(data= test1$p5, reference= test1$y_test)[["overall"]][1]
+    output_matrix[ii,6] <- caret::confusionMatrix(data= test1$p6, reference= test1$y_test)[["overall"]][1]
+  } 
+output_matrix2 <- output_matrix2 + output_matrix
+}
+
+#output_matrix2= output_matrix2/10
+```
+I don't understand why increasing the training sample size failed to increase the test accuracy,
+in my case the training and test data did come from the same distribution.
+
+wait, it may be that by chance the test dataset are not a good representative of the underlying distribution for the population.
+
+so now lets have multiple simulations but within each batch of simulation lets generate a new test dataset. 
+```{r}
+
+```
+

@@ -1,0 +1,199 @@
+---
+title: "Exercise one"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+
+# Pencil-and-paper problem
+## Problem1
+### (a)
+
+\begin{equation}
+\epsilon = (ln(\alpha/2)/-2*n)^0.5
+width= 2n\epsilon
+\end{equation}
+
+
+```{r}
+get_ci <- function(n,alpha,p){
+  e=((log(alpha/2))/(-2*n))^0.5
+  lower_b= n*(p-e)
+  upper_b= n*(p+e)
+  ci= c(lower_b,upper_b)
+  ci
+}
+```
+
+
+### (b)
+```{r}
+set.seed(1234)
+for (n in c(10,100,1000)){
+  for (p in c(0.5,0.9,0.99)){
+    w <- rbinom(10000,n,p)
+    ci=get_ci(n = n,alpha = 0.05,p = p)
+    #print(ci)
+    no <- sum(w < ci[2] & w>ci[1])
+    print(no)
+  }
+}
+
+
+```
+
+
+
+
+
+# Computer problems
+```{r}
+library(tidyverse)
+```
+
+## Problem2
+
+```{r}
+library(ISLR)
+names(College)
+fix(College)
+summary(College)
+pairs(College[,1:10])
+boxplot(College$Outstate~College$Private)
+
+Elite <- College$Top10perc > 50
+
+summary(Elite) 
+boxplot(College$Outstate~Elite)
+for (bin_no in c(3,5,10)){
+    par(mfrow=c(2,2))
+  hist(x = College$PhD,breaks = bin_no)
+  hist(x = College$S.F.Ratio,breaks = bin_no)
+  hist(x = College$Books,breaks = bin_no)
+  hist(x = College$Grad.Rate,breaks = bin_no)
+
+}
+
+
+# I made a mistake here that I should bin the same variable together to see how dis change with different breaks
+```
+
+## Problem3
+### (a)
+```{r}
+set.seed(1234)
+xi <- runif(30,-3,3)
+#hist(xi,breaks = 5)
+ei <- rnorm(30,0,0.4)
+#hist(ei,breaks = 5)
+yi <- 2+xi-0.5*xi^2 +ei
+df <- data.frame(xi,yi)
+
+p_list <- vector(mode = "list",11)
+mse_vec <- 1:11
+M_list <- vector(mode = "list",11)
+for (i in 1:11){
+  M <- lm(yi ~ poly(x = xi,degree = i))
+  mse <-  MLmetrics::MSE(predict(M),yi)
+  p <- df %>% mutate(pred= predict(M)) %>% 
+    ggplot()+
+    geom_point(aes(xi,yi))+
+    geom_line(aes(xi,pred))+
+    ggtitle(paste0("MSE = ",  mse))
+            
+  p_list[[i]] <- p
+  mse_vec[i] <- mse
+  M_list[[i]] <- M
+
+}
+
+p_list
+plot(0:10,y = mse_vec,type = "bar",xlab = "polynomial K", ylab = "training MSE")
+```
+
+### (b)
+
+```{r}
+set.seed(1234)
+xi  <- runif(1000,-3,3)
+#hist(xi,breaks = 5)
+ei  <- rnorm(1000,0,0.4)
+#hist(ei,breaks = 5)
+yi <- 2+xi -0.5*xi^2 +ei
+df  <- data.frame(xi,yi)
+
+p_list <- vector(mode = "list",11)
+mse_vec_test <- 1:11
+for (i in 1:11) {
+  pred <- predict(M_list[[i]], newdata= df )
+  mse <-  MLmetrics::MSE(y_pred = pred, y_true =  yi )
+  p <- df  %>% mutate(pred= pred) %>% 
+    ggplot()+
+    geom_point(aes(xi ,yi ))+
+    geom_line(aes(xi ,pred))+
+    ggtitle(label = paste0("MSE = ",  mse) )
+    
+  p_list[[i]] <- p
+  mse_vec_test[i] <- mse
+
+}
+ p_list
+ 
+ plot(0:10,y = mse_vec,type = "bar",xlab = "polynomial K", ylab = "test MSE")
+
+data.frame(poly_order= 0:10, training_mse = mse_vec, test_mse= mse_vec_test) %>% 
+  tbl_df %>% 
+  gather(key = MSE_type,value = ERROR,2:3) %>% 
+  ggplot() +
+  geom_point(aes(x=poly_order,y = ERROR,color=MSE_type))+
+  geom_line(aes(x=poly_order,y=ERROR,color=MSE_type))
+
+
+ 
+```
+
+
+
+### (c)
+```{r}
+# the reason 2 poly are not highest is that after CV the test error for higher p goes down and errors are some how randomly distributed so by chance it may not be the highest.
+set.seed(1234)
+xi <- runif(30,-3,3)
+#hist(xi,breaks = 5)
+ei <- rnorm(30,0,0.4)
+#hist(ei,breaks = 5)
+yi <- 2+xi-0.5*xi^2 +ei
+idx <- rep(1:10,3)
+df <- data.frame(xi,yi,idx)
+mse_mat <- matrix(1:110,nrow = 10, byrow = T)
+for (i in 1:11){
+  for(j in 1:10){
+    M <- lm(yi ~ poly(x = xi,degree = i),data = df %>% filter(idx!=j))
+    mse_mat[j,i] <-  MLmetrics::MSE(y_pred = predict(M,df %>% filter(idx==j)),
+                                    y_true = df %>% filter(idx==j) %>% pull(yi)
+                                            )
+  }
+}
+
+i=1
+j=1
+df %>% filter(idx!=j)
+
+data.frame(K= as.integer(0:10),MSE= apply(mse_mat,2,sum)) %>% 
+  tbl_df() %>% 
+  ggplot(aes(x=K,y=MSE))+
+  geom_point()+
+  geom_line()
+
+data.frame(K= as.integer(0:10),MSE= apply(mse_mat,2,sum)) %>% 
+  tbl_df() %>% arrange(MSE)
+
+seq(1,30,3)
+```
+
