@@ -218,9 +218,9 @@ cond_df <- cond_df %>%
   mutate(p5 = p5) %>% 
   mutate(p6 = p6)
 
+cond_df
 ```
 
-cond_df
 
 ## (c) 
 first compare the test set accuracy for models trained on 100 instances by using a test set of 10000 samples. note the prediction should be transformed to binary result.
@@ -286,6 +286,7 @@ for (i in 1:6){
       
 check <- cbind(model_table, Pred)    
 colnames(check)[3:8] <- c("p1","p2","p3","p4","p5","p6")
+check
 ```
 
 
@@ -334,7 +335,7 @@ So it seems that the smoothing failed to improve the test set acc
 
 
 Now we are ready for exploring how performance of different method varies under different size of training set. I start with only one-off sample of training and test set
-```{r}
+```{r,warning=F, message=F}
 #generate the equal ratio sequence as the training set size 
 a=25
 i=seq(0,8,1)
@@ -394,9 +395,9 @@ iii=a*2^i
       mutate(p5 = p5) %>% 
       mutate(p6 = p6)
     #(3)compute a model reference table.
-    py <- table(y)/100
-    px1 <- table(X[,1])/100 
-    px2 <- table(X[,2])/100
+    py <- table(y)/samplesize
+    px1 <- table(X[,1])/samplesize
+    px2 <- table(X[,2])/samplesize
     
     # intialize model table
     model_table <- data.frame(expand.grid(x1=0:1,x2=0:2))
@@ -452,6 +453,9 @@ iii=a*2^i
 # 
 # output_matrix2= output_matrix2/10
 
+  
+colnames(output_matrix) <- c("map", "Laplace", "Krichesky-Trofimov", "alpha=0","alpha=1","alpha=0.5" )
+rownames(output_matrix) <-  iii  
 output_matrix  
   
 
@@ -462,9 +466,7 @@ in my case the training and test data did come from the same distribution.
 But wait, This may due to that one-off sampling of training and test data set are by chance, not a good representation of the underlying distribution.
 
 let's check if this is the case
-```{r}
 
-```
 
 
 
@@ -475,7 +477,7 @@ So instead,  lets have multiple simulations,  within each round of simulation le
 ```{r,message=F, warning=F}
 #generate the equal ratio sequence as the training set size 
 a=25
-i=seq(0,8,1)
+i=seq(1,9,1)
 iii=a*2^i 
 output_matrix2 <- matrix(rep(0,54),nrow = 9,ncol = 6)
 sim_no <- 10
@@ -589,7 +591,8 @@ output_matrix2 <- output_matrix2 + output_matrix
 }
 
 output_matrix2= output_matrix2/sim_no
-
+colnames(output_matrix2) <- c("map", "Laplace", "Krichesky-Trofimov", "alpha=0","alpha=1","alpha=0.5" )
+rownames(output_matrix2) <-  iii  
 output_matrix2  
 ```
 
@@ -597,167 +600,6 @@ output_matrix2
 
 ## (d)
 okay lets revise the code to also derive the accuracy for logistic regression 
-
-
-
-#problematic
-```{r,message=F, warning=F,}
-#generate the equal ratio sequence as the training set size 
-a=25
-i=seq(1,9,1)
-iii=a*2^i 
-output_matrix2 <- matrix(rep(0,63),nrow = 9,ncol = 7)
-sim_no <- 10
-
-for (sim in 1:sim_no){
-  print(sim)
-  #sim=1
-  output_matrix <- matrix(-63:-1,nrow = 9,ncol = 7)
-  
-  for (ii in 1:9){
-    samplesize = iii[ii]
-    #(1) generate training data#############################################################
-    y <- sample (0:2, size =samplesize, replace =T, prob = c(0.4,0.3,0.3))
-    
-    
-    prob0 <- c(0.6,0.1,0.1,0.1,0.1,0.0)
-    prob1 <- c(2,1,4,2,0,1) /10
-    prob2 <- c(1,4,3,0,2,0) /10
-    prob_list <- list(prob0,prob1,prob2)
-    X= matrix((-2*samplesize):-1,nrow = samplesize, byrow = T )
-    colnames(X) <- c("x1","x2")
-  
-    for (i in 1:samplesize){
-      prob <- prob_list[[(y[i]+1)]]
-      X[i,] <- unlist(expand.grid(x1=0:1,x2=0:2)[sample(1:6, 1, replace=TRUE, prob=prob),])
-    }
-    
-    train <- 
-      cbind(X, y) %>% 
-      tbl_df() %>% 
-      group_by_all %>% 
-      mutate(count=1) %>% 
-      summarise(count_cat= sum(count) ) %>% 
-      ungroup()
-  
-    #(2)generate conditional probality table#############################################################
-    cond_df <- cond_df1
-    p1 <- p2 <- p3  <- p4 <- p5 <- p6 <- 1:nrow(cond_df)
-    
-    for (i in 1:nrow(cond_df)){
-      a= cond_df$x_var[i]
-      b= cond_df$x_value[i]
-      c= cond_df$y[i]
-      p1[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0,alpha_based = F)  
-      p2[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =1,alpha_based = F)  
-      p3[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0.5,alpha_based = F)  
-      p4[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0, alpha_based = T)  
-      p5[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =1, alpha_based = T)  
-      p6[i] <- con_p_fun(x_var = a,x_var_value =b ,y_value =c ,m =0.5, alpha_based = T)  
-    } 
-    
-    cond_df <- cond_df %>% 
-      mutate(p1 = p1) %>% 
-      mutate(p2 = p2) %>% 
-      mutate(p3 = p3) %>% 
-      mutate(p4 = p4) %>% 
-      mutate(p5 = p5) %>% 
-      mutate(p6 = p6)
-    #(3)compute a model reference table.################################################################
-    py <- table(y)/samplesize
-    px1 <- table(X[,1])/samplesize
-    px2 <- table(X[,2])/samplesize
-    #note that as an extreme of poorly distributed sample, if training sample size are too small, certain classes may not even exist the training sample.
-    if (length(px1) <2) {
-      tmp <- names(px1)
-      tmp1 <- c("0","1")[!(c("0","1") %in% tmp)]
-      tmp2 <- 0.0000001
-      names(tmp2) <- tmp1
-      px1 <- c(px1, tmp2 )
-    }
-      
-    if (length(px2) <3) {
-      tmp <- names(px2)
-      tmp1 <- c("0","1","2")[!(c("0","1","2") %in% tmp)]
-      tmp2 <- 0.0000001
-      names(tmp2) <- tmp1
-      px2 <- c(px2, tmp2 )
-    }
-    
-    # intialize model table
-    model_table <- data.frame(expand.grid(x1=0:1,x2=0:2))
-    Pred= matrix(data = -36:-1,nrow = 6)
-    check= matrix(data = -9:-1,nrow = 1)
-    
-    #(number of models)
-    for (i in 1:6){
-      column_name= (colnames(cond_df)[4:9])[i]
-      sym(column_name)
-      #(number of combinations for x1 and x2)
-      for (a in 1: 6) {
-        x1= model_table$x1[a]
-        x2= model_table$x2[a]
-        quo(x1)
-        quo(x2)
-        #(number of possible y)
-        p= -3:-1
-        for (b in 1:3) {
-          y_value = c(0,1,2)[b]
-          quo(y_value)
-          p1 <- cond_df %>% filter(x_var== "x1") %>% filter(x_value== !!x1)%>% filter(y== !!y_value) %>% pull(!!column_name)
-          p2 <- cond_df %>% filter(x_var== "x2") %>% filter(x_value== !!x2)%>% filter(y== !!y_value) %>% pull(!!column_name)
-          p3 <- py[b]
-  
-          p4 <- px1[x1+1]
-          p5 <- px2[x2+1]
-          names(p3)  <-names(p4) <- names(p5) <- NULL
-          p[b] <- p1*p2*p3/(p4*p5)
-         # w<- c(x1,x2,y_value,p1,p2,p3,p4,p5,p[b])
-          # check <- rbind(check,w)
-         # print(w)
-        }
-        
-        # why is there no p values? sample are too small and class are not well represented in the training sample.
-        # if (length(c(0,1,2)[which.max(p)]) != 0){
-        #   y_pred <- c(0,1,2)[which.max(p)]
-        # } else {
-        #   y_pred <- c(0,1,2)[which.max(p)]
-        # }
-
-        
-        Pred[a,i] <- y_pred
-      }
-    }
-          
-    check <- cbind(model_table, Pred)    
-    colnames(check)[3:8] <- c("p1","p2","p3","p4","p5","p6")
-    ##here I train a logistic regression model and store the prediction index as a new column for the check table:
-    data_logistic <- cbind(X, y) %>% tbl_df() %>% mutate_all(as.factor)
-    logi_m <- nnet::multinom(formula = (y ~x1+x2),data = data_logistic)
-    # here the model may also suffer from new levels that are not avaliable from the training data
-    logi_p <- predict(object = logi_m,newdata = check %>% select(1:2) %>% mutate_all(as.factor))
-    check <- check %>% mutate(p_logi= logi_p)
-
-    
-    #(4)generate specific predictions for testing data and compute accuracy########################
-    test1 <- test %>% left_join(check) %>% mutate_if(is.numeric, as.integer) %>% mutate_if(is.integer, as.factor)
-    
-    output_matrix[ii,1] <- caret::confusionMatrix(data= test1$p1, reference= test1$y_test)[["overall"]][1]
-    output_matrix[ii,2] <- caret::confusionMatrix(data= test1$p2, reference= test1$y_test)[["overall"]][1]
-    output_matrix[ii,3] <- caret::confusionMatrix(data= test1$p3, reference= test1$y_test)[["overall"]][1]
-    output_matrix[ii,4] <- caret::confusionMatrix(data= test1$p4, reference= test1$y_test)[["overall"]][1]
-    output_matrix[ii,5] <- caret::confusionMatrix(data= test1$p5, reference= test1$y_test)[["overall"]][1]
-    output_matrix[ii,6] <- caret::confusionMatrix(data= test1$p6, reference= test1$y_test)[["overall"]][1]
-    output_matrix[ii,7] <- caret::confusionMatrix(data= test1$p_logi, reference=test1$y_test)[["overall"]][1]
-   } 
-  output_matrix2 <- output_matrix2 + output_matrix
-}
-output_matrix2= output_matrix2/sim_no
-
-output_matrix2  
-```
-
-
 
 ```{r,message=FALSE, warning=FALSE}
 #generate the equal ratio sequence as the training set size 
@@ -878,7 +720,8 @@ output_matrix2 <- output_matrix2 + output_matrix
 }
 
 output_matrix2= output_matrix2/sim_no
-
+colnames(output_matrix2) <- c("map", "Laplace", "Krichesky-Trofimov", "alpha=0","alpha=1","alpha=0.5","logistic regression" )
+rownames(output_matrix2) <-  iii  
 output_matrix2  
 ```
 
@@ -887,9 +730,6 @@ output_matrix2
 ## (a)
 
 insert the pic here:
-```{r}
-
-```
 
 
 ## (b)
